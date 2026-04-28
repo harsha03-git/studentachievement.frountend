@@ -4,6 +4,7 @@ import { Achievement, initialAchievements, students, Student, teachers, Teacher,
 export type Role = "admin" | "teacher" | "student";
 
 interface AppUser {
+  id: string;
   role: Role;
   name: string;
   email: string;
@@ -13,7 +14,7 @@ interface AppUser {
 
 interface AppContextValue {
   user: AppUser | null;
-  login: (role: Role, email: string) => void;
+  login: (role: Role, email: string, password: string) => Promise<void>;
   logout: () => void;
   achievements: Achievement[];
   addAchievement: (a: Omit<Achievement, "id">) => void;
@@ -24,7 +25,7 @@ interface AppContextValue {
   students: Student[];
   teachers: Teacher[];
   assignTeacher: (studentId: string, teacherId: string) => void;
-  registerUser: (role: Role, name: string, email: string) => void;
+  registerUser: (role: Role, name: string, email: string, password: string, extraFields?: Record<string, string>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -48,61 +49,54 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (stdRes.ok) setStudentsList(await stdRes.json());
       if (tchRes.ok) setTeachersList(await tchRes.json());
     } catch (e) {
-      console.error("Backend not reachable. Run Spring Boot app on port 8081.", e);
+      console.warn("Backend not reachable. Using local data.", e);
     }
   }, []);
 
-  // Fetch initial data on mount
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const login = useCallback(async (role: Role, email: string) => {
-    if (role === "admin") {
-      setUser({ role, name: "Admin User", email });
-      return;
+  const login = useCallback(async (role: Role, email: string, password: string) => {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Login failed" }));
+      throw new Error(err.error || "Login failed");
     }
-    
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: "password123" }) // Using dummy password for integration
-      });
-      if (res.ok) {
-        const u = await res.json();
-        if (role === "teacher") {
-          setUser({ role, name: u.name, email: u.email, teacherId: u.id });
-        } else {
-          setUser({ role, name: u.name, email: u.email, studentId: u.id });
-        }
-      } else {
-        alert("Invalid credentials or backend down.");
-      }
-    } catch (e) {
-      alert("Failed to connect to backend.");
-    }
+    const u = await res.json();
+    setUser({
+      id: u.id,
+      role: u.role as Role,
+      name: u.name,
+      email: u.email,
+      teacherId: u.role === "teacher" ? u.id : undefined,
+      studentId: u.role === "student" ? u.id : undefined,
+    });
   }, []);
 
   const logout = useCallback(() => setUser(null), []);
 
-  const registerUser = useCallback(async (role: Role, name: string, email: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, name, email, password: "password123" })
-      });
-      if (res.ok) {
-        const u = await res.json();
-        if (role === "student") {
-          setStudentsList(prev => [...prev, u]);
-          setUser({ role, name: u.name, email: u.email, studentId: u.id });
-        } else if (role === "teacher") {
-          setTeachersList(prev => [...prev, u]);
-          setUser({ role, name: u.name, email: u.email, teacherId: u.id });
-        }
-      }
-    } catch (e) {
-      console.error(e);
+  const registerUser = useCallback(async (role: Role, name: string, email: string, password: string, extraFields: Record<string, string> = {}) => {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, name, email, password, ...extraFields })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Registration failed" }));
+      throw new Error(err.error || "Registration failed");
+    }
+    const u = await res.json();
+    if (role === "student") {
+      setStudentsList(prev => [...prev, u]);
+      setUser({ id: u.id, role, name: u.name, email: u.email, studentId: u.id });
+    } else if (role === "teacher") {
+      setTeachersList(prev => [...prev, u]);
+      setUser({ id: u.id, role, name: u.name, email: u.email, teacherId: u.id });
+    } else {
+      setUser({ id: u.id, role, name: u.name, email: u.email });
     }
   }, []);
 
@@ -123,7 +117,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const updateAchievement = useCallback((id: string, a: Partial<Achievement>) => {
-    // Only used locally in current UI, but leaving intact
     setAchievements((prev) => prev.map((x) => (x.id === id ? { ...x, ...a } : x)));
   }, []);
 

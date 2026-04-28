@@ -41,15 +41,18 @@ const SubmitAchievement = () => {
       parsed.error.issues.forEach((i) => { fe[i.path[0] as string] = i.message; });
       setErrors(fe); return;
     }
-    const student = students.find((s) => s.id === user.studentId)!;
+    if (!user?.studentId) {
+      toast({ title: "Error", description: "Student session not found. Please log in again.", variant: "destructive" });
+      return;
+    }
     addAchievement({
-      studentId: student.id,
+      studentId: user.studentId,
       title: parsed.data.title,
       category: parsed.data.category,
       type: parsed.data.type,
       date: parsed.data.date,
       description: parsed.data.description,
-      studentName: student.name,
+      studentName: user.name,
       status: "Pending",
     });
     toast({ title: "Achievement submitted", description: "Your achievement is pending review." });

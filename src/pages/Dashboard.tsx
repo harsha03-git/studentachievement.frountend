@@ -139,7 +139,12 @@ const Dashboard = () => {
                   <div className="text-xs text-muted-foreground">{a.studentName} · {a.category}</div>
                 </div>
                 <div className="text-xs text-muted-foreground hidden sm:block">
-                  {new Date(a.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {(() => {
+                    const d = a.date || a.submittedAt;
+                    if (!d) return "—";
+                    const parsed = new Date(d);
+                    return isNaN(parsed.getTime()) ? "—" : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                  })()}
                 </div>
               </div>
             ))}

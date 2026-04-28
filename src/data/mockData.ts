@@ -10,9 +10,14 @@ export interface Achievement {
   category: Category;
   type: AchievementType;
   status: Status;
-  date: string; // ISO
+  date: string; // ISO date from achievement event
   description: string;
   feedback?: string;
+  level?: string;
+  proofUrl?: string;
+  teacherId?: string;
+  submittedAt?: string; // ISO datetime from backend
+  reviewedAt?: string;  // ISO datetime from backend
 }
 
 export interface Student {

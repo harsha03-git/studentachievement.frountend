@@ -24,7 +24,7 @@ const Login = () => {
   const { login } = useApp();
   const navigate = useNavigate();
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse({ email, password });
     if (!parsed.success) {
@@ -35,12 +35,17 @@ const Login = () => {
     }
     setErrors({});
     setLoading(true);
-    setTimeout(() => {
-      login(role, email);
+    try {
+      await login(role, email, password);
       toast({ title: "Welcome back!", description: `Logged in as ${role}.` });
       navigate("/dashboard");
-    }, 600);
+    } catch {
+      toast({ title: "Login failed", description: "Invalid email or password.", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen w-full bg-canvas flex items-center justify-center p-4 md:p-8">
